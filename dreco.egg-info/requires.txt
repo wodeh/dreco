@@ -1,5 +1,0 @@
-dnspython
-dnsrecon
-python-nmap
-requests
-sublist3r

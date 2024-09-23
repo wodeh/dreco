@@ -105,7 +105,7 @@ def run_dnsrecon(domain):
 def run_dnsenum(domain):
     """Runs DNSEnum on the specified domain."""
     log_and_print(f"Running DNSEnum for {domain}...")
-    command = ['dnsenum', domain]
+    command = ['dnsenum', '--no-brute', domain]
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode == 0:
         log_and_print(result.stdout)
