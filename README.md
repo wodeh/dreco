@@ -13,6 +13,15 @@ DReco is a comprehensive domain enumeration and scanning tool that integrates mu
 ## Installation
 1. Clone the repository:
    ```bash
-   git clone <repository-url>
-   cd DReco
+   git clone https://github.com/wodeh/dreco.git
+   cd dreco
+   Create Virtual Environment if needed -- 
+        python -m venv:venv
+        source venv/bin/activate
+
+  pip install -r requirements.txt
+  pip install .
+
+## Running dreco
+Simply type: dreco
 
