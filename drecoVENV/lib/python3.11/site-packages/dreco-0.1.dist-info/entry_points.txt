@@ -1,0 +1,2 @@
+[console_scripts]
+dreco = dreco.main:main
