@@ -1,4 +1,7 @@
 import sys
+import csv
+import os
+import threading
 from dreco.commands import (
     get_a_records,
     get_ns_records,
@@ -10,7 +13,8 @@ from dreco.commands import (
     get_all_ips,
     run_dnsrecon,
     run_dnsenum,
-    log_and_print  # Import the logging function
+    log_and_print,
+    log_failed_hits
 )
 
 def display_welcome_message():
@@ -25,30 +29,22 @@ def display_welcome_message():
 """
     print(welcome_message)
 
-def main():
-    """Main function to execute the DReco tool."""
-    display_welcome_message()
-
-    # Prompt user for domain input
-    domain = input("Enter the domain name to scan: ").strip()
-    if not domain:
-        print("[ERROR] No domain provided. Exiting...")
-        sys.exit(1)
-
+def process_domain(domain):
+    """Process a single domain."""
     log_and_print(f"\n[INFO] Scanning domain: {domain}\n")
 
     # Retrieve DNS records
-    get_a_records(domain)
-    get_ns_records(domain)
-    get_aaaa_records(domain)
-    get_mx_records(domain)
+    a_records = get_a_records(domain)
+    ns_records = get_ns_records(domain)
+    aaaa_records = get_aaaa_records(domain)
+    mx_records = get_mx_records(domain)
 
     # Subdomain enumeration using Sublist3r
     subdomains = sublist3r_scan(domain)
 
     if not subdomains:
-        log_and_print("[ERROR] No subdomains found. Exiting...")
-        sys.exit(1)
+        log_failed_hits(f"[ERROR] No subdomains found for {domain}.")
+        return
 
     log_and_print(f"[INFO] Found subdomains: {', '.join(subdomains)}")
 
@@ -59,8 +55,8 @@ def main():
     
     ip_addresses = list(set(ip_addresses))
     if not ip_addresses:
-        log_and_print("[ERROR] No IP addresses found for the domain or its subdomains. Exiting...")
-        sys.exit(1)
+        log_failed_hits(f"[ERROR] No IP addresses found for {domain} or its subdomains.")
+        return
 
     log_and_print(f"[INFO] Found IP addresses: {', '.join(ip_addresses)}\n")
 
@@ -75,6 +71,46 @@ def main():
 
     # Fetch and display robots.txt content
     fetch_robots_txt(domain)
+
+def main():
+    """Main function to execute the DReco tool."""
+    display_welcome_message()
+
+    # Prompt user for input type
+    print("Choose an option:")
+    print("1. Single domain")
+    print("2. Multiple domains (from a text file)")
+
+    choice = input("Enter your choice (1 or 2): ").strip()
+
+    if choice == '1':
+        domain = input("Enter the domain name to scan: ").strip()
+        if not domain:
+            print("[ERROR] No domain provided. Exiting...")
+            sys.exit(1)
+        process_domain(domain)
+
+    elif choice == '2':
+        file_path = input("Enter the path to the domain list file: ").strip()
+        if not os.path.isfile(file_path):
+            print("[ERROR] File does not exist. Exiting...")
+            sys.exit(1)
+
+        with open(file_path, 'r') as f:
+            domains = [line.strip() for line in f if line.strip()]
+
+        threads = []
+        for domain in domains:
+            thread = threading.Thread(target=process_domain, args=(domain,))
+            threads.append(thread)
+            thread.start()
+
+        for thread in threads:
+            thread.join()
+
+    else:
+        print("[ERROR] Invalid choice. Exiting...")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

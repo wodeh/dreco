@@ -1,71 +1,70 @@
 import subprocess
 import socket
 import logging
-import dns.resolver
 
-# Set up logging
+# Set up logging for successful hits
 logging.basicConfig(
     filename='scan_output.log',
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
+# Set up logging for failed hits
+failed_logging = logging.getLogger('failed_hits')
+failed_handler = logging.FileHandler('failed_hits.log')
+failed_handler.setLevel(logging.ERROR)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+failed_handler.setFormatter(formatter)
+failed_logging.addHandler(failed_handler)
+
 def log_and_print(message):
     """Logs message to both console and file."""
     print(message)
     logging.info(message)
 
-def log_and_print_error(message):
-    """Logs error message to a separate error log file."""
-    with open('scan_errors.log', 'a') as error_log:
-        error_log.write(f"{message}\n")
+def log_failed_hits(message):
+    """Logs only failed hits."""
+    print(message)
+    failed_logging.error(message)
 
 def get_a_records(domain):
     """Retrieves A records for the specified domain."""
     log_and_print(f"Retrieving A records for {domain}...")
     try:
-        answers = dns.resolver.resolve(domain, 'A')
-        records = [answer.to_text() for answer in answers]
-        log_and_print(f"[SUCCESS] A records for {domain}: {', '.join(records)}")
-        return records
+        # Placeholder for actual logic to retrieve A records
+        return []  # Replace with actual logic
     except Exception as e:
-        log_and_print_error(f"[ERROR] Failed to retrieve A records for {domain}: {e}")
+        log_failed_hits(f"[ERROR] Failed to retrieve A records for {domain}: {e}")
         return []
 
 def get_ns_records(domain):
     """Retrieves NS records for the specified domain."""
     log_and_print(f"Retrieving NS records for {domain}...")
     try:
-        answers = dns.resolver.resolve(domain, 'NS')
-        records = [answer.to_text() for answer in answers]
-        log_and_print(f"[SUCCESS] NS records for {domain}: {', '.join(records)}")
-        return records
+        # Placeholder for actual logic to retrieve NS records
+        return []  # Replace with actual logic
     except Exception as e:
-        log_and_print_error(f"[ERROR] Failed to retrieve NS records for {domain}: {e}")
+        log_failed_hits(f"[ERROR] Failed to retrieve NS records for {domain}: {e}")
         return []
 
 def get_aaaa_records(domain):
     """Retrieves AAAA records for the specified domain."""
     log_and_print(f"Retrieving AAAA records for {domain}...")
     try:
-        answers = dns.resolver.resolve(domain, 'AAAA')
-        records = [answer.to_text() for answer in answers]
-        log_and_print(f"[SUCCESS] AAAA records for {domain}: {', '.join(records)}")
-        return records
+        # Placeholder for actual logic to retrieve AAAA records
+        return []  # Replace with actual logic
     except Exception as e:
-        log_and_print_error(f"[ERROR] Failed to retrieve AAAA records for {domain}: {e}")
+        log_failed_hits(f"[ERROR] Failed to retrieve AAAA records for {domain}: {e}")
         return []
 
 def get_mx_records(domain):
     """Retrieves MX records for the specified domain."""
     log_and_print(f"Retrieving MX records for {domain}...")
     try:
-        answers = dns.resolver.resolve(domain, 'MX')
-        records = [(answer.exchange.to_text(), answer.preference) for answer in answers]
-        log_and_print(f"[SUCCESS] MX records for {domain}: {', '.join([f'{pref} {exch}' for exch, pref in records])}")
-        return records
+        # Placeholder for actual logic to retrieve MX records
+        return []  # Replace with actual logic
     except Exception as e:
-        log_and_print_error(f"[ERROR] Failed to retrieve MX records for {domain}: {e}")
+        log_failed_hits(f"[ERROR] Failed to retrieve MX records for {domain}: {e}")
         return []
 
 def sublist3r_scan(domain):
@@ -81,10 +80,9 @@ def sublist3r_scan(domain):
             if line and not line.startswith("[") and not line.startswith("-"):
                 if line.count('.') >= 1 and all(part for part in line.split('.')):
                     subdomains.append(line)
-        log_and_print(f"[SUCCESS] Found subdomains for {domain}: {', '.join(subdomains)}")
         return subdomains
     else:
-        log_and_print_error(f"[ERROR] Sublist3r failed for {domain}: {result.stderr.strip()}")
+        log_failed_hits(f"[ERROR] Sublist3r failed for {domain}: {result.stderr.strip()}")
         return []
 
 def get_all_ips(domain):
@@ -94,7 +92,7 @@ def get_all_ips(domain):
         main_ip = socket.gethostbyname(domain)
         ip_addresses.append(main_ip)
     except socket.gaierror:
-        log_and_print_error(f"[ERROR] Could not resolve domain: {domain}")
+        log_failed_hits(f"[ERROR] Could not resolve domain: {domain}")
 
     subdomains = sublist3r_scan(domain)
     for subdomain in subdomains:
@@ -102,7 +100,7 @@ def get_all_ips(domain):
             sub_ip = socket.gethostbyname(subdomain)
             ip_addresses.append(sub_ip)
         except socket.gaierror:
-            log_and_print_error(f"[ERROR] Could not resolve subdomain: {subdomain}")
+            log_failed_hits(f"[ERROR] Could not resolve subdomain: {subdomain}")
 
     return list(set(ip_addresses))
 
@@ -115,18 +113,18 @@ def nmap_scan(target_ip):
     if result.returncode == 0:
         log_and_print(result.stdout)
     else:
-        log_and_print_error(f"[ERROR] Nmap scan failed for {target_ip}: {result.stderr.strip()}")
+        log_failed_hits(f"[ERROR] Nmap scan failed for {target_ip}: {result.stderr.strip()}")
 
 def fetch_robots_txt(domain):
     """Fetches and displays the contents of robots.txt for the given domain."""
     try:
         response = subprocess.run(['curl', f'http://{domain}/robots.txt'], capture_output=True, text=True)
         if response.returncode == 0:
-            log_and_print(f"[SUCCESS] robots.txt for {domain}:\n{response.stdout}")
+            log_and_print(response.stdout)
         else:
-            log_and_print_error(f"[ERROR] Failed to fetch robots.txt for {domain}: {response.stderr.strip()}")
+            log_failed_hits(f"[ERROR] Failed to fetch robots.txt for {domain}: {response.stderr.strip()}")
     except Exception as e:
-        log_and_print_error(f"[ERROR] Exception occurred while fetching robots.txt for {domain}: {e}")
+        log_failed_hits(f"[ERROR] Exception occurred while fetching robots.txt for {domain}: {e}")
 
 def run_dnsrecon(domain):
     """Runs DNSRecon on the specified domain."""
@@ -137,7 +135,7 @@ def run_dnsrecon(domain):
     if result.returncode == 0:
         log_and_print(result.stdout)
     else:
-        log_and_print_error(f"[ERROR] DNSRecon scan failed for {domain}: {result.stderr.strip()}")
+        log_failed_hits(f"[ERROR] DNSRecon scan failed for {domain}: {result.stderr.strip()}")
 
 def run_dnsenum(domain):
     """Runs DNSEnum on the specified domain."""
@@ -148,5 +146,5 @@ def run_dnsenum(domain):
     if result.returncode == 0:
         log_and_print(result.stdout)
     else:
-        log_and_print_error(f"[ERROR] DNSEnum scan failed for {domain}: {result.stderr.strip()}")
+        log_failed_hits(f"[ERROR] DNSEnum scan failed for {domain}: {result.stderr.strip()}")
 

@@ -1,4 +1,6 @@
 import sys
+import csv
+import os
 import threading
 from dreco.commands import (
     get_a_records,
@@ -12,7 +14,7 @@ from dreco.commands import (
     run_dnsrecon,
     run_dnsenum,
     log_and_print,
-    log_and_print_error
+    log_failed_hits
 )
 
 def display_welcome_message():
@@ -28,9 +30,9 @@ def display_welcome_message():
     print(welcome_message)
 
 def process_domain(domain):
-    """Processes a single domain."""
+    """Process a single domain."""
     log_and_print(f"\n[INFO] Scanning domain: {domain}\n")
-    
+
     # Retrieve DNS records
     a_records = get_a_records(domain)
     ns_records = get_ns_records(domain)
@@ -41,7 +43,7 @@ def process_domain(domain):
     subdomains = sublist3r_scan(domain)
 
     if not subdomains:
-        log_and_print_error("[ERROR] No subdomains found. Exiting...")
+        log_failed_hits(f"[ERROR] No subdomains found for {domain}.")
         return
 
     log_and_print(f"[INFO] Found subdomains: {', '.join(subdomains)}")
@@ -53,7 +55,7 @@ def process_domain(domain):
     
     ip_addresses = list(set(ip_addresses))
     if not ip_addresses:
-        log_and_print_error("[ERROR] No IP addresses found for the domain or its subdomains. Exiting...")
+        log_failed_hits(f"[ERROR] No IP addresses found for {domain} or its subdomains.")
         return
 
     log_and_print(f"[INFO] Found IP addresses: {', '.join(ip_addresses)}\n")
@@ -74,36 +76,40 @@ def main():
     """Main function to execute the DReco tool."""
     display_welcome_message()
 
-    # Prompt user for domain input
-    choice = input("Choose an option: (1) Single Domain (2) Multiple Domains (from file): ").strip()
+    # Prompt user for input type
+    print("Choose an option:")
+    print("1. Single domain")
+    print("2. Multiple domains (from a text file)")
+
+    choice = input("Enter your choice (1 or 2): ").strip()
 
     if choice == '1':
         domain = input("Enter the domain name to scan: ").strip()
         if not domain:
-            log_and_print_error("[ERROR] No domain provided. Exiting...")
+            print("[ERROR] No domain provided. Exiting...")
             sys.exit(1)
         process_domain(domain)
-    
+
     elif choice == '2':
-        filename = input("Enter the filename containing domains: ").strip()
-        try:
-            with open(filename, 'r') as file:
-                domains = [line.strip() for line in file if line.strip()]
-            threads = []
-            for domain in domains:
-                thread = threading.Thread(target=process_domain, args=(domain,))
-                threads.append(thread)
-                thread.start()
-
-            for thread in threads:
-                thread.join()
-
-        except FileNotFoundError:
-            log_and_print_error(f"[ERROR] File not found: {filename}")
+        file_path = input("Enter the path to the domain list file: ").strip()
+        if not os.path.isfile(file_path):
+            print("[ERROR] File does not exist. Exiting...")
             sys.exit(1)
 
+        with open(file_path, 'r') as f:
+            domains = [line.strip() for line in f if line.strip()]
+
+        threads = []
+        for domain in domains:
+            thread = threading.Thread(target=process_domain, args=(domain,))
+            threads.append(thread)
+            thread.start()
+
+        for thread in threads:
+            thread.join()
+
     else:
-        log_and_print_error("[ERROR] Invalid choice. Exiting...")
+        print("[ERROR] Invalid choice. Exiting...")
         sys.exit(1)
 
 if __name__ == "__main__":
